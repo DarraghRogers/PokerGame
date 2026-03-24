@@ -39,7 +39,7 @@ export default function WaitingRoom({ gameState, roomCode, isHost, onStartGame, 
         {!isHost && (
           <p className="waiting-hint">Waiting for the host to start...</p>
         )}
-        <button className="btn btn-ghost" onClick={onLeave}>Leave</button>
+        <button className="btn btn-leave" onClick={onLeave}>Leave</button>
       </div>
 
       <div className="waiting-settings">
@@ -49,6 +49,9 @@ export default function WaitingRoom({ gameState, roomCode, isHost, onStartGame, 
           <span>Small Blind</span><span>{gameState.settings.smallBlind}</span>
           <span>Big Blind</span><span>{gameState.settings.bigBlind}</span>
           <span>Turn Timer</span><span>{gameState.settings.turnTimer}s</span>
+          <span>Late Join Window</span><span>{gameState.settings.lateJoinWindow} min</span>
+          <span>Blind Increase</span>
+          <span>{gameState.settings.blindIncreaseMinutes > 0 ? `Every ${gameState.settings.blindIncreaseMinutes} min` : 'Off'}</span>
         </div>
       </div>
     </div>

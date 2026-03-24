@@ -151,10 +151,18 @@ function createGame(roomId, settings = {}) {
       smallBlind: settings.smallBlind || 10,
       bigBlind: settings.bigBlind || 20,
       turnTimer: settings.turnTimer || 30,
+      lateJoinWindow: settings.lateJoinWindow || 15,       // minutes
+      blindIncreaseMinutes: settings.blindIncreaseMinutes || 30, // minutes, 0 = disabled
     },
     log: [],
     timerEndsAt: null,
     winners: null,
+    gameStartedAt: null,         // epoch ms — set when first hand is dealt
+    nextDealAt: null,            // epoch ms — auto-deal countdown
+    gameOver: false,             // true when only 1 player has chips
+    gameWinner: null,            // name of overall winner
+    blindLevel: 0,               // current blind escalation level
+    nextBlindIncreaseAt: null,   // epoch ms
   };
 }
 
@@ -195,6 +203,40 @@ function addLog(game, msg) {
   if (game.log.length > 30) game.log.shift();
 }
 
+// ─── Late Join Check ────────────────────────────────────────────────────────
+
+function canLateJoin(game) {
+  if (game.phase === 'waiting') return true;
+  if (!game.gameStartedAt) return false;
+  const windowMs = game.settings.lateJoinWindow * 60 * 1000;
+  return Date.now() - game.gameStartedAt < windowMs;
+}
+
+// ─── Blind Escalation ───────────────────────────────────────────────────────
+
+function checkBlindIncrease(game) {
+  if (!game.settings.blindIncreaseMinutes || game.settings.blindIncreaseMinutes === 0) return;
+  if (!game.nextBlindIncreaseAt) return;
+  if (Date.now() < game.nextBlindIncreaseAt) return;
+
+  game.blindLevel++;
+  const multiplier = game.blindLevel + 1;
+  const baseSB = game.settings._baseSmallBlind || game.settings.smallBlind;
+  const baseBB = game.settings._baseBigBlind || game.settings.bigBlind;
+
+  // Store originals on first increase
+  if (!game.settings._baseSmallBlind) {
+    game.settings._baseSmallBlind = game.settings.smallBlind;
+    game.settings._baseBigBlind = game.settings.bigBlind;
+  }
+
+  game.settings.smallBlind = baseSB * multiplier;
+  game.settings.bigBlind = baseBB * multiplier;
+  game.nextBlindIncreaseAt = Date.now() + game.settings.blindIncreaseMinutes * 60 * 1000;
+
+  addLog(game, `Blinds increased to ${game.settings.smallBlind}/${game.settings.bigBlind}`);
+}
+
 // ─── Deal & Blinds ──────────────────────────────────────────────────────────
 
 function activePlayers(game) {
@@ -215,6 +257,17 @@ function nextSeat(game, seat, filterFn) {
 }
 
 function dealHand(game) {
+  // Check blind escalation before dealing
+  checkBlindIncrease(game);
+
+  // Set game start timestamp on first deal
+  if (!game.gameStartedAt) {
+    game.gameStartedAt = Date.now();
+    if (game.settings.blindIncreaseMinutes > 0) {
+      game.nextBlindIncreaseAt = Date.now() + game.settings.blindIncreaseMinutes * 60 * 1000;
+    }
+  }
+
   // Reset player state
   for (const p of game.players) {
     p.holeCards = [];
@@ -227,6 +280,7 @@ function dealHand(game) {
   game.pot = 0;
   game.currentBet = 0;
   game.winners = null;
+  game.nextDealAt = null;
   game.handNum++;
 
   // Move dealer
@@ -395,6 +449,7 @@ function advanceGame(game) {
     addLog(game, `${winner.name} wins ${game.pot} (everyone else folded)`);
     game.pot = 0;
     game.timerEndsAt = null;
+    checkGameOver(game);
     return game;
   }
 
@@ -484,6 +539,27 @@ function resolveShowdown(game) {
   game.pot = 0;
   game.timerEndsAt = null;
   game.phase = 'showdown';
+
+  checkGameOver(game);
+}
+
+// ─── Game Over Check ────────────────────────────────────────────────────────
+
+function checkGameOver(game) {
+  // Remove busted players
+  const busted = game.players.filter(p => p.chips === 0);
+  for (const p of busted) {
+    addLog(game, `${p.name} is out of chips`);
+  }
+
+  const remaining = game.players.filter(p => p.chips > 0);
+  if (remaining.length < 2) {
+    game.gameOver = true;
+    game.gameWinner = remaining[0]?.name || null;
+    if (game.gameWinner) {
+      addLog(game, `${game.gameWinner} wins the game!`);
+    }
+  }
 }
 
 // ─── Room View (privacy filter) ─────────────────────────────────────────────
@@ -514,4 +590,5 @@ module.exports = {
   advanceGame,
   roomView,
   addLog,
+  canLateJoin,
 };

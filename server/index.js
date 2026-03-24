@@ -5,7 +5,7 @@ const cors = require('cors');
 const {
   createGame, addPlayer, removePlayer,
   dealHand, applyAction, advanceGame,
-  roomView, addLog,
+  roomView, addLog, canLateJoin,
 } = require('./gameEngine');
 
 const app = express();
@@ -14,6 +14,8 @@ app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
+  pingInterval: 10000,
+  pingTimeout: 5000,
 });
 
 // ─── In-memory room store ───────────────────────────────────────────────────
@@ -64,7 +66,9 @@ function startTurnTimer(roomCode) {
       advanceGame(g);
       broadcastGameState(roomCode);
 
-      if (g.phase !== 'showdown') {
+      if (g.phase === 'showdown') {
+        scheduleAutoDeal(roomCode);
+      } else {
         startTurnTimer(roomCode);
       }
     }
@@ -76,6 +80,49 @@ function clearTurnTimer(roomCode) {
     clearTimeout(roomTimers[roomCode]);
     delete roomTimers[roomCode];
   }
+}
+
+// ─── Auto-Deal Timer ────────────────────────────────────────────────────────
+const autoDealTimers = {};
+const AUTO_DEAL_DELAY = 5000; // 5 seconds between hands
+
+function scheduleAutoDeal(roomCode) {
+  clearAutoDeal(roomCode);
+  const game = rooms[roomCode];
+  if (!game || game.gameOver) return;
+
+  game.nextDealAt = Date.now() + AUTO_DEAL_DELAY;
+  broadcastGameState(roomCode);
+
+  autoDealTimers[roomCode] = setTimeout(() => {
+    const g = rooms[roomCode];
+    if (!g || g.phase !== 'showdown' || g.gameOver) return;
+
+    // Remove busted players from future hands (they stay visible but can't play)
+    const remaining = g.players.filter(p => p.chips > 0);
+    if (remaining.length < 2) {
+      g.gameOver = true;
+      g.gameWinner = remaining[0]?.name || null;
+      if (g.gameWinner) {
+        addLog(g, `${g.gameWinner} wins the game!`);
+      }
+      broadcastGameState(roomCode);
+      return;
+    }
+
+    dealHand(g);
+    broadcastGameState(roomCode);
+    startTurnTimer(roomCode);
+  }, AUTO_DEAL_DELAY);
+}
+
+function clearAutoDeal(roomCode) {
+  if (autoDealTimers[roomCode]) {
+    clearTimeout(autoDealTimers[roomCode]);
+    delete autoDealTimers[roomCode];
+  }
+  const game = rooms[roomCode];
+  if (game) game.nextDealAt = null;
 }
 
 // ─── Socket Events ──────────────────────────────────────────────────────────
@@ -100,8 +147,12 @@ io.on('connection', (socket) => {
   socket.on('joinRoom', ({ roomCode, playerName }, callback) => {
     const game = rooms[roomCode];
     if (!game) return callback({ error: 'Room not found' });
-    if (game.phase !== 'waiting') return callback({ error: 'Game already in progress' });
     if (game.players.length >= 9) return callback({ error: 'Room is full' });
+
+    // Allow join during waiting phase OR during late-join window
+    if (game.phase !== 'waiting' && !canLateJoin(game)) {
+      return callback({ error: 'Late join window has closed' });
+    }
 
     const playerId = `p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     addPlayer(game, playerId, playerName);
@@ -165,44 +216,13 @@ io.on('connection', (socket) => {
     advanceGame(game);
     broadcastGameState(meta.roomCode);
 
-    if (game.phase !== 'showdown') {
-      startTurnTimer(meta.roomCode);
-    } else {
+    if (game.phase === 'showdown') {
       clearTurnTimer(meta.roomCode);
+      scheduleAutoDeal(meta.roomCode);
+    } else {
+      startTurnTimer(meta.roomCode);
     }
 
-    callback?.({ success: true });
-  });
-
-  socket.on('nextHand', (_, callback) => {
-    const meta = socketMeta[socket.id];
-    if (!meta) return callback?.({ error: 'Not in a room' });
-
-    const game = rooms[meta.roomCode];
-    if (!game) return callback?.({ error: 'Room not found' });
-    if (game.phase !== 'showdown') return callback?.({ error: 'Hand is still in progress' });
-
-    // Only host can deal next hand
-    if (game.players[0]?.id !== meta.playerId) {
-      return callback?.({ error: 'Only the host can deal the next hand' });
-    }
-
-    // Remove players with 0 chips
-    const busted = game.players.filter(p => p.chips === 0);
-    for (const p of busted) {
-      addLog(game, `${p.name} is out of chips`);
-    }
-
-    const remaining = game.players.filter(p => p.chips > 0);
-    if (remaining.length < 2) {
-      addLog(game, `${remaining[0]?.name || 'Nobody'} wins the game!`);
-      broadcastGameState(meta.roomCode);
-      return callback?.({ error: 'Not enough players with chips to continue' });
-    }
-
-    dealHand(game);
-    broadcastGameState(meta.roomCode);
-    startTurnTimer(meta.roomCode);
     callback?.({ success: true });
   });
 

@@ -7,11 +7,19 @@ export default function Lobby({ onCreateRoom, onJoinRoom }) {
   const [startingChips, setStartingChips] = useState(1000);
   const [smallBlind, setSmallBlind] = useState(10);
   const [bigBlind, setBigBlind] = useState(20);
+  const [lateJoinWindow, setLateJoinWindow] = useState(15);
+  const [blindIncreaseMinutes, setBlindIncreaseMinutes] = useState(30);
 
   const handleCreate = (e) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onCreateRoom(name.trim(), { startingChips, smallBlind, bigBlind });
+    onCreateRoom(name.trim(), {
+      startingChips,
+      smallBlind,
+      bigBlind,
+      lateJoinWindow,
+      blindIncreaseMinutes,
+    });
   };
 
   const handleJoin = (e) => {
@@ -79,6 +87,29 @@ export default function Lobby({ onCreateRoom, onJoinRoom }) {
                 value={bigBlind}
                 onChange={e => setBigBlind(Number(e.target.value))}
                 min={2}
+              />
+            </label>
+          </div>
+          <div className="lobby-blinds">
+            <label>
+              <span>Late Join (min)</span>
+              <input
+                type="number"
+                value={lateJoinWindow}
+                onChange={e => setLateJoinWindow(Number(e.target.value))}
+                min={0}
+                max={120}
+              />
+            </label>
+            <label>
+              <span>Blind Increase (min)</span>
+              <input
+                type="number"
+                value={blindIncreaseMinutes}
+                onChange={e => setBlindIncreaseMinutes(Number(e.target.value))}
+                min={0}
+                max={120}
+                placeholder="0 = off"
               />
             </label>
           </div>
