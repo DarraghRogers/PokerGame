@@ -239,6 +239,27 @@ io.on('connection', (socket) => {
     io.to(meta.roomCode).emit('reaction', { playerName: player.name, emoji });
   });
 
+  socket.on('chatMessage', ({ text }) => {
+    const meta = socketMeta[socket.id];
+    if (!meta) return;
+
+    const game = rooms[meta.roomCode];
+    if (!game) return;
+
+    const player = game.players.find(p => p.id === meta.playerId);
+    if (!player) return;
+
+    const trimmed = text.trim().slice(0, 200);
+    if (!trimmed) return;
+
+    io.to(meta.roomCode).emit('chatMessage', {
+      id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      playerName: player.name,
+      text: trimmed,
+      ts: Date.now(),
+    });
+  });
+
   socket.on('disconnect', () => {
     const meta = socketMeta[socket.id];
     if (!meta) return;

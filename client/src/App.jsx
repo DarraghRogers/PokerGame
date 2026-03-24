@@ -5,6 +5,7 @@ import WaitingRoom from './components/WaitingRoom';
 import GameTable from './components/GameTable';
 import HandOverModal from './components/HandOverModal';
 import EmojiReactions from './components/EmojiReactions';
+import ChatPanel from './components/ChatPanel';
 import ConfirmDialog from './components/ConfirmDialog';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || '';
@@ -17,6 +18,9 @@ export default function App() {
   const [roomCode, setRoomCode] = useState(null);
   const [error, setError] = useState(null);
   const [reactions, setReactions] = useState([]);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatUnread, setChatUnread] = useState(0);
+  const chatOpenRef = useRef(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   useEffect(() => {
@@ -44,6 +48,13 @@ export default function App() {
       setTimeout(() => {
         setReactions(prev => prev.filter(r => r.id !== id));
       }, 2800);
+    });
+
+    socket.on('chatMessage', (msg) => {
+      setChatMessages(prev => [...prev.slice(-99), msg]);
+      if (!chatOpenRef.current) {
+        setChatUnread(prev => prev + 1);
+      }
     });
 
     // On reconnect, automatically rejoin the room
@@ -101,6 +112,15 @@ export default function App() {
 
   const sendReaction = useCallback((emoji) => {
     socketRef.current.emit('reaction', { emoji });
+  }, []);
+
+  const sendChatMessage = useCallback((text) => {
+    socketRef.current.emit('chatMessage', { text });
+  }, []);
+
+  const handleChatToggle = useCallback((isOpen) => {
+    chatOpenRef.current = isOpen;
+    if (isOpen) setChatUnread(0);
   }, []);
 
   const doLeave = useCallback(() => {
@@ -168,6 +188,15 @@ export default function App() {
       )}
 
       <EmojiReactions reactions={reactions} onSendReaction={sendReaction} />
+
+      {(screen === 'waiting' || screen === 'game') && (
+        <ChatPanel
+          messages={chatMessages}
+          onSendMessage={sendChatMessage}
+          unreadCount={chatUnread}
+          onToggle={handleChatToggle}
+        />
+      )}
 
       {showLeaveConfirm && (
         <ConfirmDialog
