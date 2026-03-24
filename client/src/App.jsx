@@ -187,7 +187,9 @@ export default function App() {
         </>
       )}
 
-      <EmojiReactions reactions={reactions} onSendReaction={sendReaction} />
+      {screen === 'game' && (
+        <EmojiReactions reactions={reactions} onSendReaction={sendReaction} />
+      )}
 
       {(screen === 'waiting' || screen === 'game') && (
         <ChatPanel
