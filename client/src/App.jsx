@@ -5,6 +5,7 @@ import WaitingRoom from './components/WaitingRoom';
 import GameTable from './components/GameTable';
 import HandOverModal from './components/HandOverModal';
 import EmojiReactions from './components/EmojiReactions';
+import ConfirmDialog from './components/ConfirmDialog';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || '';
 
@@ -16,9 +17,16 @@ export default function App() {
   const [roomCode, setRoomCode] = useState(null);
   const [error, setError] = useState(null);
   const [reactions, setReactions] = useState([]);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   useEffect(() => {
-    const socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
+    const socket = io(SERVER_URL, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+    });
     socketRef.current = socket;
 
     socket.on('gameState', (state) => {
@@ -38,19 +46,21 @@ export default function App() {
       }, 2800);
     });
 
-    // Attempt rejoin from localStorage
-    const saved = localStorage.getItem('the-table-session');
-    if (saved) {
-      const { playerId: savedId, roomCode: savedRoom } = JSON.parse(saved);
-      socket.emit('rejoinRoom', { playerId: savedId, roomCode: savedRoom }, (res) => {
-        if (res.error) {
-          localStorage.removeItem('the-table-session');
-        } else {
-          setPlayerId(savedId);
-          setRoomCode(savedRoom);
-        }
-      });
-    }
+    // On reconnect, automatically rejoin the room
+    socket.on('connect', () => {
+      const saved = localStorage.getItem('the-table-session');
+      if (saved) {
+        const { playerId: savedId, roomCode: savedRoom } = JSON.parse(saved);
+        socket.emit('rejoinRoom', { playerId: savedId, roomCode: savedRoom }, (res) => {
+          if (res.error) {
+            localStorage.removeItem('the-table-session');
+          } else {
+            setPlayerId(savedId);
+            setRoomCode(savedRoom);
+          }
+        });
+      }
+    });
 
     return () => socket.disconnect();
   }, []);
@@ -89,23 +99,22 @@ export default function App() {
     });
   }, []);
 
-  const nextHand = useCallback(() => {
-    socketRef.current.emit('nextHand', null, (res) => {
-      if (res?.error) setError(res.error);
-    });
-  }, []);
-
   const sendReaction = useCallback((emoji) => {
     socketRef.current.emit('reaction', { emoji });
   }, []);
 
-  const leaveTable = useCallback(() => {
+  const doLeave = useCallback(() => {
     localStorage.removeItem('the-table-session');
     setScreen('lobby');
     setGameState(null);
     setPlayerId(null);
     setRoomCode(null);
+    setShowLeaveConfirm(false);
     window.location.reload();
+  }, []);
+
+  const requestLeave = useCallback(() => {
+    setShowLeaveConfirm(true);
   }, []);
 
   const isHost = gameState?.players?.[0]?.id === playerId;
@@ -120,7 +129,7 @@ export default function App() {
 
       {error && (
         <div className="error-banner" onClick={() => setError(null)}>
-          {error} <span className="error-dismiss">×</span>
+          {error} <span className="error-dismiss">&times;</span>
         </div>
       )}
 
@@ -134,7 +143,7 @@ export default function App() {
           roomCode={roomCode}
           isHost={isHost}
           onStartGame={startGame}
-          onLeave={leaveTable}
+          onLeave={requestLeave}
         />
       )}
 
@@ -146,20 +155,27 @@ export default function App() {
             me={me}
             isHost={isHost}
             onAction={sendAction}
-            onNextHand={nextHand}
-            onLeave={leaveTable}
+            onLeave={requestLeave}
           />
           {gameState.phase === 'showdown' && gameState.winners && (
             <HandOverModal
+              gameState={gameState}
               winners={gameState.winners}
-              isHost={isHost}
-              onNextHand={nextHand}
+              onLeave={requestLeave}
             />
           )}
         </>
       )}
 
       <EmojiReactions reactions={reactions} onSendReaction={sendReaction} />
+
+      {showLeaveConfirm && (
+        <ConfirmDialog
+          message="Are you sure you want to leave?"
+          onConfirm={doLeave}
+          onCancel={() => setShowLeaveConfirm(false)}
+        />
+      )}
     </div>
   );
 }

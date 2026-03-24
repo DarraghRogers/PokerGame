@@ -1,20 +1,33 @@
 import Card from './Card';
 
-export default function HandOverModal({ winners, isHost, onNextHand }) {
+export default function HandOverModal({ gameState, winners, onLeave }) {
   if (!winners || winners.length === 0) return null;
 
   const winner = winners[0];
+  const isGameOver = gameState.gameOver;
+  const gameWinner = gameState.gameWinner;
 
   return (
     <div className="modal-overlay">
       <div className="modal">
-        <h2 className="modal-title">Hand Over</h2>
-
-        <div className="winner-display">
-          <span className="winner-name">{winner.name}</span>
-          <span className="winner-result">wins {winner.chips}</span>
-          {winner.hand && <span className="winner-hand">{winner.hand}</span>}
-        </div>
+        {isGameOver ? (
+          <>
+            <h2 className="modal-title">Game Over</h2>
+            <div className="winner-display">
+              <span className="winner-name">{gameWinner}</span>
+              <span className="winner-result">wins the game!</span>
+            </div>
+          </>
+        ) : (
+          <>
+            <h2 className="modal-title">Hand Over</h2>
+            <div className="winner-display">
+              <span className="winner-name">{winner.name}</span>
+              <span className="winner-result">wins {winner.chips}</span>
+              {winner.hand && <span className="winner-hand">{winner.hand}</span>}
+            </div>
+          </>
+        )}
 
         {winner.holeCards && (
           <div className="winner-cards">
@@ -43,13 +56,12 @@ export default function HandOverModal({ winners, isHost, onNextHand }) {
           </div>
         )}
 
-        {isHost && (
-          <button className="btn btn-primary modal-btn" onClick={onNextHand}>
-            Deal Next Hand
+        {isGameOver ? (
+          <button className="btn btn-primary modal-btn" onClick={onLeave}>
+            Return to Lobby
           </button>
-        )}
-        {!isHost && (
-          <p className="waiting-hint">Waiting for host to deal...</p>
+        ) : (
+          <p className="auto-deal-hint">Next hand deals automatically...</p>
         )}
       </div>
     </div>

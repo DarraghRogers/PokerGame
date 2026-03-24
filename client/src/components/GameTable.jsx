@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import Card from './Card';
 import ActionPanel from './ActionPanel';
 
-export default function GameTable({ gameState, playerId, me, isHost, onAction, onNextHand, onLeave }) {
-  const { players, community, pot, phase, dealerSeat, actionSeat, log, timerEndsAt } = gameState;
+export default function GameTable({ gameState, playerId, me, isHost, onAction, onLeave }) {
+  const { players, community, pot, phase, dealerSeat, actionSeat, log, timerEndsAt, nextDealAt, settings, nextBlindIncreaseAt } = gameState;
 
   const isMyTurn = me && me.seatIndex === actionSeat && !me.folded && !me.allIn && phase !== 'showdown' && phase !== 'waiting';
 
@@ -11,10 +11,20 @@ export default function GameTable({ gameState, playerId, me, isHost, onAction, o
     <div className="game-table">
       {/* Pot & Community Cards */}
       <div className="table-center">
-        <div className="pot-display">
-          <span className="pot-label">Pot</span>
-          <span className="pot-amount">{pot}</span>
+        <div className="table-info-row">
+          <div className="pot-display">
+            <span className="pot-label">Pot</span>
+            <span className="pot-amount">{pot}</span>
+          </div>
+          <div className="blinds-display">
+            <span className="blinds-label">Blinds</span>
+            <span className="blinds-amount">{settings.smallBlind}/{settings.bigBlind}</span>
+          </div>
         </div>
+
+        {nextBlindIncreaseAt && (
+          <BlindTimer endsAt={nextBlindIncreaseAt} />
+        )}
 
         <div className="community-cards">
           {community.map((card, i) => (
@@ -26,6 +36,10 @@ export default function GameTable({ gameState, playerId, me, isHost, onAction, o
         </div>
 
         <div className="phase-badge">{phase}</div>
+
+        {phase === 'showdown' && nextDealAt && (
+          <AutoDealCountdown endsAt={nextDealAt} />
+        )}
       </div>
 
       {/* Player Seats */}
@@ -99,7 +113,7 @@ export default function GameTable({ gameState, playerId, me, isHost, onAction, o
         ))}
       </div>
 
-      <button className="btn btn-ghost btn-sm leave-btn" onClick={onLeave}>Leave</button>
+      <button className="btn btn-leave leave-btn" onClick={onLeave}>Leave</button>
     </div>
   );
 }
@@ -119,6 +133,45 @@ function TimerBar({ endsAt }) {
   return (
     <div className="timer-bar">
       <div className="timer-fill" style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
+function AutoDealCountdown({ endsAt }) {
+  const [seconds, setSeconds] = useState(5);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+      setSeconds(remaining);
+    }, 200);
+    return () => clearInterval(interval);
+  }, [endsAt]);
+
+  return (
+    <div className="auto-deal-countdown">
+      Next hand in {seconds}s
+    </div>
+  );
+}
+
+function BlindTimer({ endsAt }) {
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const diff = Math.max(0, endsAt - Date.now());
+      const mins = Math.floor(diff / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      setTimeLeft(`${mins}:${secs.toString().padStart(2, '0')}`);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [endsAt]);
+
+  return (
+    <div className="blind-timer">
+      <span className="blind-timer-label">Next blind increase</span>
+      <span className="blind-timer-value">{timeLeft}</span>
     </div>
   );
 }

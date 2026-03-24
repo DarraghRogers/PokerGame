@@ -712,7 +712,31 @@ body {
 }
 
 .leave-btn {
-  align-self: flex-start;
+  align-self: flex-end;
+}
+
+/* ─── Leave Button (prominent, right-aligned) ───────────────────────────── */
+.btn-leave {
+  background: var(--danger);
+  color: white;
+  font-weight: 600;
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  min-height: 44px;
+}
+.btn-leave:hover {
+  background: #c0392b;
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: white;
+}
+.btn-danger:hover {
+  background: #c0392b;
 }
 
 /* ─── Modal ──────────────────────────────────────────────────────────────── */
@@ -813,6 +837,87 @@ body {
 
 .modal-btn {
   margin-top: 8px;
+}
+
+.auto-deal-hint {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* ─── Confirm Dialog ─────────────────────────────────────────────────────── */
+.confirm-modal {
+  max-width: 320px;
+}
+
+.confirm-message {
+  font-size: 1.1rem;
+  color: var(--cream);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.confirm-actions .btn {
+  flex: 1;
+}
+
+/* ─── Blind Timer & Auto-Deal ────────────────────────────────────────────── */
+.table-info-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  justify-content: center;
+}
+
+.blinds-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.blinds-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.blinds-amount {
+  font-family: 'DM Mono', monospace;
+  font-size: 1rem;
+  color: var(--cream);
+  font-weight: 600;
+}
+
+.blind-timer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'DM Mono', monospace;
+}
+
+.blind-timer-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.blind-timer-value {
+  font-size: 0.85rem;
+  color: var(--gold-light);
+  font-weight: 600;
+}
+
+.auto-deal-countdown {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.85rem;
+  color: var(--gold);
+  background: var(--felt-dark);
+  padding: 4px 14px;
+  border-radius: 20px;
 }
 
 /* ─── Emoji Reactions ────────────────────────────────────────────────────── */
