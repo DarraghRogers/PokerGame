@@ -5,7 +5,7 @@ const cors = require('cors');
 const {
   createGame, addPlayer, removePlayer,
   dealHand, applyAction, advanceGame,
-  roomView, addLog, canLateJoin,
+  roomView, addLog, canLateJoin, checkBlindIncrease,
 } = require('./gameEngine');
 
 const app = express();
@@ -31,6 +31,8 @@ function generateCode() {
 function broadcastGameState(roomCode) {
   const game = rooms[roomCode];
   if (!game) return;
+  // Check if blinds need to increase before sending state
+  checkBlindIncrease(game);
   for (const player of game.players) {
     const socketId = playerSockets[player.id];
     if (socketId) {

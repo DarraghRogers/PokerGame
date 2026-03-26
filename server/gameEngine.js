@@ -152,7 +152,7 @@ function createGame(roomId, settings = {}) {
       bigBlind: settings.bigBlind || 20,
       turnTimer: settings.turnTimer || 30,
       lateJoinWindow: settings.lateJoinWindow || 15,       // minutes
-      blindIncreaseMinutes: settings.blindIncreaseMinutes || 30, // minutes, 0 = disabled
+      blindIncreaseMinutes: Number(settings.blindIncreaseMinutes) >= 0 ? Number(settings.blindIncreaseMinutes) : 30, // minutes, 0 = disabled
     },
     log: [],
     timerEndsAt: null,
@@ -215,14 +215,13 @@ function canLateJoin(game) {
 // ─── Blind Escalation ───────────────────────────────────────────────────────
 
 function checkBlindIncrease(game) {
-  if (!game.settings.blindIncreaseMinutes || game.settings.blindIncreaseMinutes === 0) return;
-  if (!game.nextBlindIncreaseAt) return;
-  if (Date.now() < game.nextBlindIncreaseAt) return;
+  const mins = Number(game.settings.blindIncreaseMinutes) || 0;
+  if (mins <= 0) return false;
+  if (!game.nextBlindIncreaseAt) return false;
+  if (Date.now() < game.nextBlindIncreaseAt) return false;
 
   game.blindLevel++;
   const multiplier = game.blindLevel + 1;
-  const baseSB = game.settings._baseSmallBlind || game.settings.smallBlind;
-  const baseBB = game.settings._baseBigBlind || game.settings.bigBlind;
 
   // Store originals on first increase
   if (!game.settings._baseSmallBlind) {
@@ -230,11 +229,15 @@ function checkBlindIncrease(game) {
     game.settings._baseBigBlind = game.settings.bigBlind;
   }
 
+  const baseSB = game.settings._baseSmallBlind;
+  const baseBB = game.settings._baseBigBlind;
+
   game.settings.smallBlind = baseSB * multiplier;
   game.settings.bigBlind = baseBB * multiplier;
-  game.nextBlindIncreaseAt = Date.now() + game.settings.blindIncreaseMinutes * 60 * 1000;
+  game.nextBlindIncreaseAt = Date.now() + mins * 60 * 1000;
 
   addLog(game, `Blinds increased to ${game.settings.smallBlind}/${game.settings.bigBlind}`);
+  return true;
 }
 
 // ─── Deal & Blinds ──────────────────────────────────────────────────────────
@@ -591,4 +594,5 @@ module.exports = {
   roomView,
   addLog,
   canLateJoin,
+  checkBlindIncrease,
 };

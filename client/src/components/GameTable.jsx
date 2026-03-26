@@ -155,18 +155,25 @@ function AutoDealCountdown({ endsAt }) {
   );
 }
 
+function formatBlindTime(endsAt) {
+  const diff = Math.max(0, endsAt - Date.now());
+  const mins = Math.floor(diff / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
 function BlindTimer({ endsAt }) {
-  const [timeLeft, setTimeLeft] = useState('');
+  const [timeLeft, setTimeLeft] = useState(() => formatBlindTime(endsAt));
 
   useEffect(() => {
+    setTimeLeft(formatBlindTime(endsAt));
     const interval = setInterval(() => {
-      const diff = Math.max(0, endsAt - Date.now());
-      const mins = Math.floor(diff / 60000);
-      const secs = Math.floor((diff % 60000) / 1000);
-      setTimeLeft(`${mins}:${secs.toString().padStart(2, '0')}`);
+      setTimeLeft(formatBlindTime(endsAt));
     }, 1000);
     return () => clearInterval(interval);
   }, [endsAt]);
+
+  if (timeLeft === '0:00') return null;
 
   return (
     <div className="blind-timer">
